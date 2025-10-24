@@ -1,0 +1,111 @@
+{
+  "1_CREATE_QUOTATION": {
+    "method": "POST",
+    "url": "http://localhost:5000/api/quotations/create",
+    "body": {
+      "companyDetails": {
+        "companyName": "M/S N G Electricals",
+        "addressLine": "123 Main Street, Industrial Area",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400001",
+        "contactNumber": "+91-9876543210",
+        "email": "info@ngelectricals.com"
+      },
+      "customerDetails": {
+        "customerName": "Rajesh Kumar",
+        "customerCompanyName": "ABC Industries Pvt Ltd",
+        "addressLine": "456 Business Park, Sector 15",
+        "city": "Delhi",
+        "state": "Delhi",
+        "pincode": "110001",
+        "contactNumber": "+91-9876543211"
+      },
+      "date": "2025-01-15",
+      "items": [
+        {
+          "sNo": 1,
+          "particulars": "LED Bulbs 9W - Cool White",
+          "hsnCode": "8539",
+          "quantity": 100,
+          "unit": "Nos",
+          "rate": 50,
+          "cgst": 9,
+          "sgst": 9,
+          "igst": 0,
+          "amount": 5000
+        },
+        {
+          "sNo": 2,
+          "particulars": "LED Tube Light 20W",
+          "hsnCode": "8539",
+          "quantity": 50,
+          "unit": "Nos",
+          "rate": 150,
+          "cgst": 9,
+          "sgst": 9,
+          "igst": 0,
+          "amount": 7500
+        }
+      ],
+      "totals": {
+        "taxableAmount": 12500,
+        "totalCGST": 1125,
+        "totalSGST": 1125,
+        "totalIGST": 0,
+        "grandTotal": 14750
+      }
+    }
+  },
+
+  "2_CREATE_PROFORMA": {
+    "method": "POST",
+    "url": "http://localhost:5000/api/proforma/create",
+    "note": "First create a quotation, then use the quotationNumber you receive",
+    "body": {
+      "quotationNumber": "QUT/2024-2025/001",
+      "bankDetails": {
+        "bankName": "State Bank of India",
+        "accountNumber": "1234567890123456",
+        "ifscCode": "SBIN0001234",
+        "branch": "Mumbai Main Branch"
+      }
+    }
+  },
+
+  "3_CREATE_FINAL_INVOICE": {
+    "method": "POST",
+    "url": "http://localhost:5000/api/finalinvoices/create",
+    "note": "Use the same quotationNumber from step 1",
+    "body": {
+      "quotationNumber": "QUT/2024-2025/001",
+      "bankDetails": {
+        "bankName": "State Bank of India",
+        "accountNumber": "1234567890123456",
+        "ifscCode": "SBIN0001234",
+        "branch": "Mumbai Main Branch"
+      },
+      "dispatchDetails": {
+        "deliveryType": "Express Courier Service",
+        "dispatchDate": "2025-01-20",
+        "courierName": "Blue Dart Express",
+        "trackingNumber": "BD123456789IN"
+      }
+    }
+  },
+
+  "4_GET_ALL_QUOTATIONS": {
+    "method": "GET",
+    "url": "http://localhost:5000/api/quotations/all"
+  },
+
+  "5_GET_ALL_PROFORMA": {
+    "method": "GET",
+    "url": "http://localhost:5000/api/proforma/all"
+  },
+
+  "6_GET_ALL_INVOICES": {
+    "method": "GET",
+    "url": "http://localhost:5000/api/finalinvoices/all"
+  }
+}

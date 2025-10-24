@@ -1,0 +1,600 @@
+import React, { useState } from 'react';
+import axios from 'axios';
+
+const InvoiceForm = () => {
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ text: '', type: '' });
+
+  // Form state
+  const [formData, setFormData] = useState({
+    companyDetails: {
+      companyName: 'BASE PLUS LIMITED',
+      companyAddress: '',
+      contactNumber: '',
+      email: ''
+    },
+    customerDetails: {
+      customerName: '',
+      customerCompanyName: '',
+      address: '',
+      contactNumber: ''
+    },
+    quotationDetails: {
+      quotationNumber: '',
+      date: new Date().toISOString().split('T')[0]
+    },
+    items: [
+      {
+        sNo: 1,
+        particulars: '',
+        quantity: 1,
+        unit: 'Nos',
+        rate: 0,
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        amount: 0
+      }
+    ]
+  });
+
+  // Calculate amount for a single item
+  const calculateItemAmount = (quantity, rate) => {
+    return quantity * rate;
+  };
+
+  // Calculate tax amount
+  const calculateTaxAmount = (amount, taxPercentage) => {
+    return (amount * taxPercentage) / 100;
+  };
+
+  // Calculate totals
+  const calculateTotals = () => {
+    let taxableAmount = 0;
+    let totalCGST = 0;
+    let totalSGST = 0;
+    let totalIGST = 0;
+
+    formData.items.forEach(item => {
+      taxableAmount += item.amount;
+      totalCGST += calculateTaxAmount(item.amount, item.cgst);
+      totalSGST += calculateTaxAmount(item.amount, item.sgst);
+      totalIGST += calculateTaxAmount(item.amount, item.igst);
+    });
+
+    const grandTotal = taxableAmount + totalCGST + totalSGST + totalIGST;
+
+    return {
+      taxableAmount: parseFloat(taxableAmount.toFixed(2)),
+      totalCGST: parseFloat(totalCGST.toFixed(2)),
+      totalSGST: parseFloat(totalSGST.toFixed(2)),
+      totalIGST: parseFloat(totalIGST.toFixed(2)),
+      grandTotal: parseFloat(grandTotal.toFixed(2))
+    };
+  };
+
+  // Handle company details change
+  const handleCompanyChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      companyDetails: {
+        ...prev.companyDetails,
+        [name]: value
+      }
+    }));
+  };
+
+  // Handle customer details change
+  const handleCustomerChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      customerDetails: {
+        ...prev.customerDetails,
+        [name]: value
+      }
+    }));
+  };
+
+  // Handle quotation details change
+  const handleQuotationChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      quotationDetails: {
+        ...prev.quotationDetails,
+        [name]: value
+      }
+    }));
+  };
+
+  // Handle item change
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...formData.items];
+    newItems[index][field] = value;
+
+    // Recalculate amount when quantity or rate changes
+    if (field === 'quantity' || field === 'rate') {
+      const quantity = parseFloat(newItems[index].quantity) || 0;
+      const rate = parseFloat(newItems[index].rate) || 0;
+      newItems[index].amount = calculateItemAmount(quantity, rate);
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      items: newItems
+    }));
+  };
+
+  // Add new item row
+  const addItem = () => {
+    const newItem = {
+      sNo: formData.items.length + 1,
+      particulars: '',
+      quantity: 1,
+      unit: 'Nos',
+      rate: 0,
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+      amount: 0
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+  };
+
+  // Remove item row
+  const removeItem = (index) => {
+    if (formData.items.length > 1) {
+      const newItems = formData.items.filter((_, i) => i !== index);
+      // Renumber items
+      newItems.forEach((item, i) => {
+        item.sNo = i + 1;
+      });
+
+      setFormData(prev => ({
+        ...prev,
+        items: newItems
+      }));
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage({ text: '', type: '' });
+
+    try {
+      const totals = calculateTotals();
+      const invoiceData = {
+        ...formData,
+        totals
+      };
+
+      const response = await axios.post('http://localhost:5000/api/invoices/create', invoiceData);
+
+      if (response.data.success) {
+        setMessage({ text: 'Invoice generated successfully!', type: 'success' });
+
+        // Download PDF
+        const pdfFilename = response.data.pdfPath;
+        const downloadUrl = `http://localhost:5000/api/invoices/download/${pdfFilename}`;
+        
+        // Create a temporary anchor element and trigger download
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = pdfFilename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      setMessage({ 
+        text: error.response?.data?.message || 'Error generating invoice. Please try again.', 
+        type: 'error' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totals = calculateTotals();
+
+  return (
+    <div className="bg-white rounded-lg shadow-xl p-8">
+      <form onSubmit={handleSubmit}>
+        {/* Company Details Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 border-b-2 border-blue-500 pb-2">
+            Company Details
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="companyName"
+                value={formData.companyDetails.companyName}
+                onChange={handleCompanyChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter company name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email ID <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.companyDetails.email}
+                onChange={handleCompanyChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="company@example.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company Address <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="companyAddress"
+                value={formData.companyDetails.companyAddress}
+                onChange={handleCompanyChange}
+                required
+                rows="2"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter company address"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                name="contactNumber"
+                value={formData.companyDetails.contactNumber}
+                onChange={handleCompanyChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="+91-XXXXXXXXXX"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Customer Details Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 border-b-2 border-green-500 pb-2">
+            Customer Details
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="customerName"
+                value={formData.customerDetails.customerName}
+                onChange={handleCustomerChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter customer name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Company Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="customerCompanyName"
+                value={formData.customerDetails.customerCompanyName}
+                onChange={handleCustomerChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter customer company name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Address <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="address"
+                value={formData.customerDetails.address}
+                onChange={handleCustomerChange}
+                required
+                rows="2"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter customer address"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                name="contactNumber"
+                value={formData.customerDetails.contactNumber}
+                onChange={handleCustomerChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="+91-XXXXXXXXXX"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Quotation Details Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 border-b-2 border-purple-500 pb-2">
+            Quotation Details
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Quotation Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="quotationNumber"
+                value={formData.quotationDetails.quotationNumber}
+                onChange={handleQuotationChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., QT-2025-001"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="date"
+                value={formData.quotationDetails.date}
+                onChange={handleQuotationChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Items Section */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold text-gray-800 border-b-2 border-orange-500 pb-2">
+              Item Details
+            </h2>
+            <button
+              type="button"
+              onClick={addItem}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition duration-200 flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Item
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border border-gray-300">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">S.No</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">Particulars</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">Qty</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">Unit</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">Rate</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">CGST%</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">SGST%</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">IGST%</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">Amount</th>
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.items.map((item, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="border border-gray-300 px-2 py-2 text-center">
+                      {item.sNo}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <input
+                        type="text"
+                        value={item.particulars}
+                        onChange={(e) => handleItemChange(index, 'particulars', e.target.value)}
+                        required
+                        className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                        placeholder="Item description"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        required
+                        min="0"
+                        step="0.01"
+                        className="w-20 px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <select
+                        value={item.unit}
+                        onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                        className="w-20 px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="Nos">Nos</option>
+                        <option value="Pcs">Pcs</option>
+                        <option value="Kg">Kg</option>
+                        <option value="Ltr">Ltr</option>
+                        <option value="Mtr">Mtr</option>
+                        <option value="Box">Box</option>
+                        <option value="Set">Set</option>
+                      </select>
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <input
+                        type="number"
+                        value={item.rate}
+                        onChange={(e) => handleItemChange(index, 'rate', parseFloat(e.target.value) || 0)}
+                        required
+                        min="0"
+                        step="0.01"
+                        className="w-24 px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <input
+                        type="number"
+                        value={item.cgst}
+                        onChange={(e) => handleItemChange(index, 'cgst', parseFloat(e.target.value) || 0)}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-20 px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <input
+                        type="number"
+                        value={item.sgst}
+                        onChange={(e) => handleItemChange(index, 'sgst', parseFloat(e.target.value) || 0)}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-20 px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <input
+                        type="number"
+                        value={item.igst}
+                        onChange={(e) => handleItemChange(index, 'igst', parseFloat(e.target.value) || 0)}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-20 px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2 text-right font-semibold">
+                      ₹{item.amount.toFixed(2)}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        disabled={formData.items.length === 1}
+                        className={`text-red-500 hover:text-red-700 disabled:text-gray-300 disabled:cursor-not-allowed`}
+                        title="Remove item"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Totals Summary */}
+        <div className="mb-8 bg-gray-50 p-6 rounded-lg">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Summary</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between text-lg">
+              <span className="font-medium">Taxable Amount:</span>
+              <span className="font-semibold">₹{totals.taxableAmount.toFixed(2)}</span>
+            </div>
+            {totals.totalCGST > 0 && (
+              <div className="flex justify-between">
+                <span className="font-medium">Total CGST:</span>
+                <span className="font-semibold text-blue-600">₹{totals.totalCGST.toFixed(2)}</span>
+              </div>
+            )}
+            {totals.totalSGST > 0 && (
+              <div className="flex justify-between">
+                <span className="font-medium">Total SGST:</span>
+                <span className="font-semibold text-blue-600">₹{totals.totalSGST.toFixed(2)}</span>
+              </div>
+            )}
+            {totals.totalIGST > 0 && (
+              <div className="flex justify-between">
+                <span className="font-medium">Total IGST:</span>
+                <span className="font-semibold text-blue-600">₹{totals.totalIGST.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="border-t-2 border-gray-300 pt-2 mt-2">
+              <div className="flex justify-between text-xl">
+                <span className="font-bold">Grand Total:</span>
+                <span className="font-bold text-green-600">₹{totals.grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Message Display */}
+        {message.text && (
+          <div className={`mb-4 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {message.text}
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="flex justify-center">
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-8 py-3 rounded-lg font-semibold text-lg transition duration-200 flex items-center gap-3"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating...
+              </>
+            ) : (
+              <>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Generate PDF Invoice
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default InvoiceForm;
