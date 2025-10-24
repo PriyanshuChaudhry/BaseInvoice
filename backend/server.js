@@ -28,18 +28,24 @@ const app = express();
 // Middleware
 // Configure CORS for production
 const allowedOrigins = [
-  'http://localhost:3000', // Frontend development URL
-  process.env.FRONTEND_URL // Vercel frontend URL
-];
+  'http://localhost:3000',
+  'https://base-invoice.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean); // Remove undefined values
+
+console.log('🔒 CORS Allowed Origins:', allowedOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {
+    console.log('📨 Request from origin:', origin);
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
+      console.log('❌ CORS blocked origin:', origin);
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
+    console.log('✅ CORS allowed origin:', origin);
     return callback(null, true);
   },
   credentials: true
